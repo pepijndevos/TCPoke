@@ -2,6 +2,13 @@ import socket
 import time
 import struct
 import enum
+import hid
+
+paths = [t['path'] for t in hid.enumerate(5824, 1158) if t['usage'] == 512]
+teensy = hid.device()
+teensy.open_path(paths[0])
+teensy.set_nonblocking(1)
+buf = bytearray([0]*64)
 
 class Command(enum.IntEnum):
     version = 1
@@ -22,22 +29,35 @@ def command(cmd, b1=0, b2=0, b3=0):
 
 def parse(data):
     res = struct.unpack(fmt, data)
-    return (Command(res[0]),) + res[1:]
+    return (Command(res[0]),) + res[1:4]
 
 def read_all(sock):
     try:
         while True:
-            print(parse(sock.recv(pkgsize)))
-    except socket.timeout:
+            yield parse(sock.recv(pkgsize))
+    except BlockingIOError:
         pass
 
 if __name__ == "__main__":
     with socket.create_connection(("127.0.0.1", 8765)) as sock:
-        sock.settimeout(0.3)
+        sock.settimeout(0)
         sock.send(command(Command.version, 1, 4))
         read_all(sock)
         sock.send(command(Command.status, 1))
         read_all(sock)
         while True:
-            sock.send(command(Command.master, 0x02, 0x81))
-            read_all(sock)
+            time.sleep(0.1)
+            #sock.send(command(Command.sync, 0))
+            print("doing stuff")
+            try:
+                in_data = teensy.read(64)[0]
+                print("tnsy", hex(in_data))
+                sock.send(command(Command.slave, in_data, 0x81))
+            except IndexError:
+                pass
+                
+            for cmd, b1, b2, b3 in read_all(sock):
+                print(cmd, hex(b1))
+                if cmd == Command.master and b1 != 0xFE:
+                    buf[0] = b1
+                    teensy.write(buf)
