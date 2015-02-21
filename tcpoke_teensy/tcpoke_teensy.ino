@@ -25,6 +25,7 @@ void loop() {
     if(connected) {
         if(out_data) {
             out_data = buffer[0];
+            if(buffer[1]) connected = false; // reset
         } else {
             out_data = SERIAL_NO_DATA_BYTE;
         }

@@ -6,6 +6,12 @@ teensy.open_path(paths[0])
 teensy.set_nonblocking(1)
 buf = bytearray([0]*64)
 
+#reset
+buf[0:2] = [0x01, 0x01]
+teensy.write(buf)
+buf[0:2] = [0x00, 0x00]
+
+
 with socket.create_connection((sys.argv[1], sys.argv[2])) as sock:
     sock.setblocking(False)
     while True:
