@@ -21,22 +21,21 @@ bool connected = false;
 
 void loop() {
     byte in_data = 0;
-    byte out_data = 0;
+    byte out_data = RawHID.recv(buffer, DELAY);
     if(connected) {
-        if(RawHID.recv(buffer, DELAY)) {
+        if(out_data) {
             out_data = buffer[0];
         } else {
             out_data = SERIAL_NO_DATA_BYTE;
         }
     } else {
         out_data = ESTABLISH_CONNECTION_WITH_INTERNAL_CLOCK;
-        delay(DELAY);
     }
     in_data = SPI.transfer(out_data);
     Serial.print(in_data, HEX);
     Serial.print("\n");
 
-    if(connected || in_data == SERIAL_NYBLE) {
+    if((connected || in_data == SERIAL_NYBLE) && in_data != SERIAL_NO_DATA_BYTE) {
         connected = true;
         buffer[0] = in_data;
         RawHID.send(buffer, DELAY);
