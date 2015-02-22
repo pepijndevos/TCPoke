@@ -3,7 +3,7 @@
   <head>
     <script src="http://cdn.peerjs.com/0.3/peer.js"></script>    
     <script>
-    var peer = new Peer({host: 'tcpoke.herokuapp.com', port: 80});
+    var peer = new Peer("echo", {host: 'tcpoke.herokuapp.com', port: 80});
     peer.on('open', function(id) {
         console.log(id);
     });
