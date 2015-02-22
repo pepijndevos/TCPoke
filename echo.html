@@ -1,0 +1,22 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <script src="http://cdn.peerjs.com/0.3/peer.js"></script>    
+    <script>
+    var peer = new Peer({host: 'tcpoke.herokuapp.com', port: 80});
+    peer.on('open', function(id) {
+        console.log(id);
+    });
+    peer.on('connection', function(conn) {
+        console.log(conn)
+        conn.on('data', function(data){
+          console.log(data);
+          conn.send(data);
+        });
+    });
+    </script>
+  </head>
+  <body>
+    <h1>Test</h1>
+  </body>
+</html>

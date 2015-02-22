@@ -1,10 +1,35 @@
 (function() {
-  var connection = -1;
+  var peer;
+  var hid_connection;
+  var peer_connection;
+
   var inputlog;
+  var outputlog;
+  var peerdisplay;
+  var peerform;
 
   var initializeWindow = function() {
     inputlog = document.getElementById("inputlog");
-    enumerateDevices();
+    outputlog = document.getElementById("outputlog");
+    peerdisplay = document.getElementById("peerid");
+    peerform = document.getElementById("connectform");
+
+    peer = new Peer({host: 'tcpoke.herokuapp.com', port: 80});
+    peer.on('open', function(id) {
+      peerdisplay.textContent = id;
+    });
+    peer.on('connection', function(conn) {
+      peer_connection = conn;
+      peer_connection.on('data', sendOutput);
+      enumerateDevices();
+    });
+
+    peerform.addEventListener("submit", function(e) {
+      e.preventDefault();
+      peer_connection = peer.connect(this.connectid.value);
+      peer_connection.on('data', sendOutput);
+      enumerateDevices();
+    });
   };
 
   var enumerateDevices = function() {
@@ -31,42 +56,31 @@
       if (!connectInfo) {
         console.warn("Unable to connect to device.");
       }
-      connection = connectInfo.connectionId;
+      hid_connection = connectInfo.connectionId;
+      reset();
       pollForInput();
     });
   };
 
-  var onSendClicked = function() {
-    var id = +ui.outId.value;
-    var bytes = new Uint8Array(+ui.outSize.value);
-    var contents = ui.outData.value;
-    contents = contents.replace(/\\x[a-fA-F0-9]{2}/g, function(match, capture) {
-      return String.fromCharCode(parseInt(capture, 16));
-    });
-    for (var i = 0; i < contents.length && i < bytes.length; ++i) {
-      if (contents.charCodeAt(i) > 255) {
-        throw "I am not smart enough to decode non-ASCII data.";
-      }
-      bytes[i] = contents.charCodeAt(i);
-    }
-    var pad = +ui.outPad.value;
-    for (var i = contents.length; i < bytes.length; ++i) {
-      bytes[i] = pad;
-    }
-    ui.send.disabled = true;
-    chrome.hid.send(connection, id, bytes.buffer, function() {
-      ui.send.disabled = false;
-    });
+  var reset = function() {
+    var bytes = new Uint8Array(64);
+    bytes[1] = 1;
+    chrome.hid.send(hid_connection, 0, bytes.buffer, function() {});
   };
 
-  var isReceivePending = false;
+  var sendOutput = function(out_data) {
+    outputlog.textContent += byteToHex(out_data) + " ";
+    var bytes = new Uint8Array(64);
+    bytes[0] = out_data;
+    chrome.hid.send(hid_connection, 0, bytes.buffer, function() {});
+  };
+
   var pollForInput = function() {
-    isReceivePending = true;
-    chrome.hid.receive(connection, function(reportId, data) {
+    chrome.hid.receive(hid_connection, function(reportId, data) {
       isReceivePending = false;
       var data = new Uint8Array(data);
-      console.log(data[0]);
       inputlog.textContent += byteToHex(data[0]) + " ";
+      peer_connection.send(data[0]);
       setTimeout(pollForInput, 0);
     });
   };

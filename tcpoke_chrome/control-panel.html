@@ -3,10 +3,17 @@
   <head>
     <link rel="stylesheet" href="style.css">
     <script src="control-panel.js"></script>
+    <script src="dep/peer.js"></script>
   </head>
   <body>
     <h1>TCPoke</h1>
-    <div id="inputlog">
-    </div>
+    <h2 id="peerid"></h2>
+    <form id="connectform">
+      <label for="connectid">Connect to</label>
+      <input name="connectid" type="text" />
+      <input type="submit" value="Connect" />
+    <form>
+    <div id="inputlog"></div>
+    <div id="outputlog"></div>
   </body>
 </html>
