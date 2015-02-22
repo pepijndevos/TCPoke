@@ -5,7 +5,7 @@
 #define ESTABLISH_CONNECTION_WITH_EXTERNAL_CLOCK 0x02
 #define SERIAL_NYBLE 0x60
 
-#define DELAY 100
+#define DELAY 500
 
 byte buffer[64];
 
