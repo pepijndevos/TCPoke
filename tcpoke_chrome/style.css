@@ -1,3 +1,8 @@
 body {
   font-family: monospace;
 }
+
+.border {
+    border: 14px double black;
+    border-image: url(border.png) 14 repeat;
+}
