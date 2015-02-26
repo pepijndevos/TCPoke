@@ -1,0 +1,30 @@
+{
+  "name": "tcpoke_chrome",
+  "version": "0.0.0",
+  "homepage": "https://github.com/pepijndevos/TCPoke",
+  "authors": [
+    "Pepijn de Vos <pepijndevos@gmail.com>"
+  ],
+  "description": "Internet of Pokemon",
+  "main": "main.js",
+  "moduleType": [
+    "globals"
+  ],
+  "keywords": [
+    "gameboy",
+    "pokemon"
+  ],
+  "license": "MIT",
+  "ignore": [
+    "**/.*",
+    "node_modules",
+    "bower_components",
+    "test",
+    "tests"
+  ],
+  "dependencies": {
+    "jquery": "~2.1.3",
+    "peerjs": "~0.3.14",
+    "react": "~0.12.2"
+  }
+}
