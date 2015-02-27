@@ -9,14 +9,39 @@
 
 (def chat (stream/stream))
 
-(defn websocket-handler [req]
-  (let [ws @(http/websocket-connection req)
-        input (stream/map #(json/decode % true) ws)
-        messages (stream/filter :text input)
-        output (stream/map json/encode chat)]
-    (stream/consume println input)
+(defn chat-handler [input]
+  (let [messages (stream/filter :text input)]
     (stream/connect messages chat {:downstream? false})
-    (stream/connect output ws)))
+    chat))
+
+(def users (atom {}))
+
+(defn user-handler [uuid input ws]
+  (stream/consume #(swap! users update-in [uuid] merge %) input)
+  (stream/on-closed ws #(swap! users dissoc uuid))
+  (stream/periodically 30000 0 (fn [] {:users @users})))
+
+(def session-broadcast (stream/stream))
+
+(defn session-handler [uuid input]
+  (let [sessions (stream/filter :to input)
+        output (stream/filter #(= (:to %) uuid) session-broadcast)]
+    (stream/connect sessions session-broadcast {:downstream? false})
+    output))
+
+(defn connect-json [in out]
+  (let [output (stream/map json/encode in)]
+    (stream/connect output out)))
+
+(defn websocket-handler [req]
+  (let [uuid (.toString (java.util.UUID/randomUUID))
+        ws @(http/websocket-connection req)
+        input (stream/map #(json/decode % true) ws)]
+    (stream/consume println input)
+    (stream/put! ws (json/encode {:uuid uuid}))
+    (connect-json (user-handler uuid input ws) ws)
+    (connect-json (chat-handler input) ws)
+    (connect-json (session-handler uuid input) ws)))
 
 (defroutes app-routes
   (GET "/" [] (response "Hello world"))
@@ -27,4 +52,4 @@
 
 (defn -main [port]
   (println "A wild server appeared!")
-  (http/start-server app {:port (Integer/parseInt port)}))
+  (http/start-server #'app {:port (Integer/parseInt port)}))
