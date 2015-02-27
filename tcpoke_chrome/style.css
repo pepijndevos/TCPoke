@@ -6,3 +6,8 @@ body {
     border: 14px double black;
     border-image: url(border.png) 14 repeat;
 }
+
+#chatbox {
+  height: 200px;
+  overflow-y: scroll;
+}

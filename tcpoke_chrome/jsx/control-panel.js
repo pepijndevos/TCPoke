@@ -1,3 +1,52 @@
+var ChatBox = React.createClass({
+  addMessage: function(e) {
+    console.log(e.data);
+    var message = JSON.parse(e.data);
+    if (message.text) {
+      this.state.messages.push(message);
+      this.setState(this.state);
+    }
+  },
+  sendMessage: function(e) {
+    e.preventDefault();
+    var author = this.refs.author.getDOMNode().value.trim();
+    var text = this.refs.text.getDOMNode().value.trim();
+    if (!text || !author) {
+      return;
+    }
+
+    console.log(author, text);
+    message = JSON.stringify({author: author, text: text});
+    this.props.socket.send(message);
+
+    this.refs.text.getDOMNode().value = '';
+  },
+  getInitialState: function() {
+    return {messages: []};
+  },
+  componentDidMount: function() {
+    this.props.socket.addEventListener("message", this.addMessage);
+  },
+  render: function() {
+    msgs = this.state.messages.map(function (msg, idx) {
+      return (
+        <div key={idx}><strong>{msg.author}</strong> <span>{msg.text}</span></div>
+      );
+    });
+    return (
+      <div>
+        <div id="chatbox" className="border">
+        {msgs}
+        </div>
+        <form className="commentForm" onSubmit={this.sendMessage}>
+          <input type="text" placeholder="Your name" ref="author" />
+          <input type="text" placeholder="Say something..." ref="text" />
+          <input type="submit" value="Post" />
+        </form>
+      </div>
+    );
+  }
+});
 
 var Connection = React.createClass({
   getInitialState: function() {
@@ -14,8 +63,15 @@ var Connection = React.createClass({
 });
 
 window.addEventListener('load', function () {
+  socket = new WebSocket("ws://localhost:3000/websocket");
+  socket.onopen = function () { console.log(arguments); };
+  socket.onclose = function () { console.log(arguments); };
+  socket.onerror = function () { console.log(arguments); };
   React.render(
-    <Connection name="Game Boy" />,
+    <div>
+      <Connection name="Game Boy" />
+      <ChatBox socket={socket}/>
+    </div>,
     document.body
   );
 });
