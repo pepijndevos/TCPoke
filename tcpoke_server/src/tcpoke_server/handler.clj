@@ -16,6 +16,10 @@
 
 (def users (atom {}))
 
+(defn init-user [uuid ws]
+  (stream/put! ws (json/encode {:uuid uuid}))
+  (swap! users assoc uuid {:author "Ash"}))
+
 (defn user-handler [uuid input ws]
   (stream/consume #(swap! users update-in [uuid] merge %) input)
   (stream/on-closed ws #(swap! users dissoc uuid))
@@ -38,7 +42,7 @@
         ws @(http/websocket-connection req)
         input (stream/map #(json/decode % true) ws)]
     (stream/consume println input)
-    (stream/put! ws (json/encode {:uuid uuid}))
+    (init-user uuid ws)
     (connect-json (user-handler uuid input ws) ws)
     (connect-json (chat-handler input) ws)
     (connect-json (session-handler uuid input) ws)))

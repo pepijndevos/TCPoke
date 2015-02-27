@@ -1,11 +1,7 @@
 var ChatBox = React.createClass({
-  addMessage: function(e) {
-    console.log(e.data);
-    var message = JSON.parse(e.data);
-    if (message.text) {
-      this.state.messages.push(message);
-      this.setState(this.state);
-    }
+  addMessage: function(message) {
+    this.state.messages.push(message);
+    this.setState(this.state);
   },
   sendMessage: function(e) {
     e.preventDefault();
@@ -15,17 +11,15 @@ var ChatBox = React.createClass({
       return;
     }
 
-    console.log(author, text);
-    message = JSON.stringify({author: author, text: text});
-    this.props.socket.send(message);
+    this.props.session.sendChat(author, text);
 
     this.refs.text.getDOMNode().value = '';
   },
+  componentDidMount: function() {
+    this.props.session.register("text", this.addMessage);
+  },
   getInitialState: function() {
     return {messages: []};
-  },
-  componentDidMount: function() {
-    this.props.socket.addEventListener("message", this.addMessage);
   },
   render: function() {
     msgs = this.state.messages.map(function (msg, idx) {
@@ -48,34 +42,101 @@ var ChatBox = React.createClass({
   }
 });
 
-var Connection = React.createClass({
+var UserList = React.createClass({
+  setUsers: function(users) {
+    this.setState(users);
+  },
+  componentDidMount: function() {
+    this.props.session.register("users", this.setUsers);
+  },
   getInitialState: function() {
-    return {connected: false};
+    return {users: {}};
   },
   render: function() {
+    users = [];
+    for (var key in this.state.users) {
+      if (this.state.users.hasOwnProperty(key)) {
+        var user = this.state.users[key];
+        users.push(
+          <li key={key}>{user.author}</li>
+        );
+      }
+    }
     return (
-      <div>
-        <label>{this.props.name}</label>
-        <input type="checkbox" checked={this.state.connected} />
-      </div>
+      <ul id="userlist" className="border">
+      {users}
+      </ul>
     );
   }
 });
 
+function SessionHandler() {
+  var self = this;
+
+  var callbacks = {};
+  self.register = function(key, callback) {
+    callbacks[key] = callback;
+  }
+
+  var uuid = undefined;
+  callbacks["uuid"] = function(message) { uuid = message.uuid; };
+
+  self.sendChat = function(author, text) {
+    self.socket.send(JSON.stringify({
+      "uuid": uuid,
+      "text": text,
+      "author": author
+    }));
+  }
+  
+  self.connect = function(them) {
+    var pc = new RTCPeerConnection();
+    pc.createOffer(function(offer) {
+      pc.setLocalDescription(new RTCSessionDescription(offer), function() {
+        self.socket.send(JSON.encode({
+          "to": them,
+          "uuid": uuid,
+          "session": offer,
+        }));
+      }, pc.close);
+    }, pc.close);
+    return pc;
+  }
+
+  var init = function() {
+    self.socket = new WebSocket("ws://localhost:3000/websocket");
+   
+    self.socket.onclose = function () { setTimeout(init, 10*1000); };
+    self.socket.onerror = function () { setTimeout(init, 20*1000); };
+
+    self.socket.onopen  = function (e) { console.log(e); };
+
+    self.socket.onmessage = function (e) {
+      message = JSON.parse(e.data);
+      console.log(message);
+      for (var key in callbacks) {
+        if (callbacks.hasOwnProperty(key) && message.hasOwnProperty(key)) {
+          callbacks[key](message);
+        }
+      }
+    };
+  };
+  init();
+
+}
+
 window.addEventListener('load', function () {
-  socket = new WebSocket("ws://localhost:3000/websocket");
-  socket.onopen = function () { console.log(arguments); };
-  socket.onclose = function () { console.log(arguments); };
-  socket.onerror = function () { console.log(arguments); };
+  window.session = new SessionHandler();
   React.render(
     <div>
-      <Connection name="Game Boy" />
-      <ChatBox socket={socket}/>
+      <UserList session={session} />
+      <ChatBox session={session} />
     </div>,
     document.body
   );
 });
 
+//TODO integrate everything below
 function initialize () {
   peer = new Peer("imac", {host: 'tcpoke.herokuapp.com', port: 80});
   peer.on('open', function(id) {
