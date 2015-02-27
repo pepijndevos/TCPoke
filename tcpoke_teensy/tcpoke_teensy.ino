@@ -5,7 +5,9 @@
 #define ESTABLISH_CONNECTION_WITH_EXTERNAL_CLOCK 0x02
 #define SERIAL_NYBLE 0x60
 
-#define DELAY 1000
+#define READ_DELAY 10 // Gen II requires a fast negotiation
+#define WRITE_DELAY 1000 // Try not to lose bytes
+
 
 byte buffer[64];
 
@@ -21,8 +23,9 @@ bool connected = false;
 
 void loop() {
     byte in_data = 0;
-    byte out_data = RawHID.recv(buffer, DELAY);
+    byte out_data = RawHID.recv(buffer, READ_DELAY);
     if(out_data) {
+        connected = true;
         out_data = buffer[0];
         if(buffer[1]) connected = false; // reset
     } else if (!connected) {
@@ -34,9 +37,9 @@ void loop() {
     Serial.print(in_data, HEX);
     Serial.print("\n");
 
-    if(connected || in_data == SERIAL_NYBLE) {
+    if(connected || in_data == SERIAL_NYBLE || in_data == SERIAL_NYBLE+1) {
         connected = true;
         buffer[0] = in_data;
-        RawHID.send(buffer, DELAY);
+        RawHID.send(buffer, WRITE_DELAY);
     }
 }
