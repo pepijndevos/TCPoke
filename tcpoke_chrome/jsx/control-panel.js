@@ -107,6 +107,15 @@ function SessionHandler() {
   
   self.connect = function(them) {
     var pc = new RTCPeerConnection(rtcsettings);
+    pc.onicecandidate = function(e) {
+      if(e.candidate) {
+        self.socket.send(JSON.stringify({
+          "to": them,
+          "uuid": uuid,
+          "candidate": e.candidate,
+        }));
+      }
+    };
     self.channel = pc.createDataChannel("gamelink");
     console.log(pc, self.channel);
     self.peerconnection = pc;
@@ -128,40 +137,40 @@ function SessionHandler() {
         self.peerconnection.close);
   }
 
+  callbacks["candidate"] = function(message) {
+    console.log(message)
+    self.peerconnection.addIceCandidate(new RTCIceCandidate(message.candidate));
+  }
+
   callbacks["offer"] = function(message) {
-    var id = undefined;
     var offer = message.offer;
-    chrome.notifications.create("",
-          {"title": "Incomming connection",
-            "message": "Do you want to play?",
-            "type": "basic",
-            "iconUrl": "images/gameboy.png",
-            "buttons": [{"title": "Connect"}],
-          },
-          function(cbid){id = cbid;});
-    // This will leak callbacks
-    chrome.notifications.onButtonClicked.addListener(function (cbid, idx){
-      if(id == cbid) {
-        var pc = new RTCPeerConnection(rtcsettings);
-        pc.ondatachannel = function(ch) {
-          self.channel = ch;
-          console.log(self.channel);
-        }
-        console.log(pc);
-        pc.setRemoteDescription(new RTCSessionDescription(offer), function() {
-          pc.createAnswer(function(answer) {
-            pc.setLocalDescription(new RTCSessionDescription(answer), function() {
-              self.socket.send(JSON.stringify({
-                "to": message.uuid,
-                "uuid": uuid,
-                "answer": answer,
-              }));
-            }, pc.close);
-          }, pc.close);
-        }, pc.close);
-        self.peerconnection = pc;
+    var pc = new RTCPeerConnection(rtcsettings);
+    self.peerconnection = pc;
+    pc.onicecandidate = function(e) {
+      if(e.candidate) {
+        self.socket.send(JSON.stringify({
+          "to": message.uuid,
+          "uuid": uuid,
+          "candidate": e.candidate,
+        }));
       }
-    });
+    };
+    pc.ondatachannel = function(e) {
+      self.channel = e.channel;
+      console.log(self.channel);
+    }
+    console.log(pc);
+    pc.setRemoteDescription(new RTCSessionDescription(offer), function() {
+      pc.createAnswer(function(answer) {
+        pc.setLocalDescription(new RTCSessionDescription(answer), function() {
+          self.socket.send(JSON.stringify({
+            "to": message.uuid,
+            "uuid": uuid,
+            "answer": answer,
+          }));
+        }, pc.close);
+      }, pc.close);
+    }, pc.close);
   };
 
   var init = function() {
