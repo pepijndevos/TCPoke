@@ -1,3 +1,12 @@
+var rtcsettings = {
+  iceServers: [
+    {url: "stun:stun.ekiga.net"},
+    {url: "stun:stun.voipbuster.com"},
+    {url: "stun:stun.1.google.com:19302"},
+    // yadayada
+  ]   
+};
+
 var ChatBox = React.createClass({
   addMessage: function(message) {
     this.state.messages.push(message);
@@ -43,6 +52,10 @@ var ChatBox = React.createClass({
 });
 
 var UserList = React.createClass({
+  connect: function(uuid, e) {
+    console.log(uuid);
+    this.props.session.connect(uuid);
+  },
   setUsers: function(users) {
     this.setState(users);
   },
@@ -58,7 +71,7 @@ var UserList = React.createClass({
       if (this.state.users.hasOwnProperty(key)) {
         var user = this.state.users[key];
         users.push(
-          <li key={key}>{user.author}</li>
+          <li key={key} onClick={this.connect.bind(this, key)}>{user.author}</li>
         );
       }
     }
@@ -82,7 +95,7 @@ function SessionHandler() {
   }
 
   var uuid = undefined;
-  callbacks["uuid"] = function(message) { uuid = message.uuid; };
+  callbacks["myuuid"] = function(message) { uuid = message.myuuid; };
 
   self.sendChat = function(author, text) {
     self.socket.send(JSON.stringify({
@@ -93,24 +106,77 @@ function SessionHandler() {
   }
   
   self.connect = function(them) {
-    var pc = new RTCPeerConnection();
+    var pc = new RTCPeerConnection(rtcsettings);
+    self.channel = pc.createDataChannel("gamelink");
+    console.log(pc, self.channel);
+    self.peerconnection = pc;
     pc.createOffer(function(offer) {
       pc.setLocalDescription(new RTCSessionDescription(offer), function() {
-        self.socket.send(JSON.encode({
+        self.socket.send(JSON.stringify({
           "to": them,
           "uuid": uuid,
-          "session": offer,
+          "offer": offer,
         }));
       }, pc.close);
     }, pc.close);
-    return pc;
   }
+
+  callbacks["answer"] = function(message) {
+    self.peerconnection.setRemoteDescription(
+        new RTCSessionDescription(message.answer),
+        function() { },
+        self.peerconnection.close);
+  }
+
+  callbacks["offer"] = function(message) {
+    var id = undefined;
+    var offer = message.offer;
+    chrome.notifications.create("",
+          {"title": "Incomming connection",
+            "message": "Do you want to play?",
+            "type": "basic",
+            "iconUrl": "images/gameboy.png",
+            "buttons": [{"title": "Connect"}],
+          },
+          function(cbid){id = cbid;});
+    // This will leak callbacks
+    chrome.notifications.onButtonClicked.addListener(function (cbid, idx){
+      if(id == cbid) {
+        var pc = new RTCPeerConnection(rtcsettings);
+        pc.ondatachannel = function(ch) {
+          self.channel = ch;
+          console.log(self.channel);
+        }
+        console.log(pc);
+        pc.setRemoteDescription(new RTCSessionDescription(offer), function() {
+          pc.createAnswer(function(answer) {
+            pc.setLocalDescription(new RTCSessionDescription(answer), function() {
+              self.socket.send(JSON.stringify({
+                "to": message.uuid,
+                "uuid": uuid,
+                "answer": answer,
+              }));
+            }, pc.close);
+          }, pc.close);
+        }, pc.close);
+        self.peerconnection = pc;
+      }
+    });
+  };
 
   var init = function() {
     self.socket = new WebSocket("ws://localhost:3000/websocket");
    
-    self.socket.onclose = function () { setTimeout(init, 10*1000); };
-    self.socket.onerror = function () { setTimeout(init, 20*1000); };
+    self.socket.onerror = function () { self.socket.close() };
+    self.socket.onclose = function () {
+      chrome.notifications.create("wsclose",
+          {"title": "Server connection lost",
+            "message": "Attempting to reconnect",
+            "type": "basic",
+            "iconUrl": "images/globe.gif"},
+          function(){});
+      setTimeout(init, 30000);
+    };
 
     self.socket.onopen  = function (e) { console.log(e); };
 
@@ -139,28 +205,7 @@ window.addEventListener('load', function () {
   );
 });
 
-//TODO integrate everything below
-function initialize () {
-  peer = new Peer("imac", {host: 'tcpoke.herokuapp.com', port: 80});
-  peer.on('open', function(id) {
-    peerdisplay.textContent = id;
-  });
-  peer.on('connection', function(conn) {
-    console.log(conn);
-    peer_connection = conn;
-    peer_connection.on('data', sendOutput);
-    enumerateDevices();
-  });
-
-  peerform.addEventListener("submit", function(e) {
-    e.preventDefault();
-    peer_connection = peer.connect(this.connectid.value);
-    peer_connection.on('data', sendOutput);
-    enumerateDevices();
-  });
-}
-
-var enumerateDevices = function() {
+function enumerateDevices() {
   var deviceIds = [];
   var permissions = chrome.runtime.getManifest().permissions;
   for (var i = 0; i < permissions.length; ++i) {
@@ -185,8 +230,8 @@ function connectDevice (deviceInfo) {
       console.warn("Unable to connect to device.");
     }
     hid_connection = connectInfo.connectionId;
-    reset();
-    pollForInput();
+    reset(hid_connection);
+    pollForInput(console.log);
   });
 }
 

@@ -1,3 +1,7 @@
+// It took me four years to paint like Raphael,
+// but a lifetime to paint like a child.
+// -- Pablo Picasso
+
 #include <SPI.h>
 
 #define SERIAL_NO_DATA_BYTE 0xFE

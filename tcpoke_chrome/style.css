@@ -41,7 +41,7 @@ body, html, .container {
 #connection {
   background-image: url(images/pipe.png);
   background-repeat: repeat-x;
-  background-position: 0 22px;
+  background-position: 0 27px;
   width: 400px;
   margin: 0 auto;
 }
@@ -98,8 +98,8 @@ input[type="submit"] {
   background-image: url(images/arrow.png);
   background-repeat: no-repeat;
   background-position: 0 -16px;
-  margin: 0;
   padding: 0 0 0 16px;
+  margin: 5px;
 }
 
 input[type="submit"]:active {

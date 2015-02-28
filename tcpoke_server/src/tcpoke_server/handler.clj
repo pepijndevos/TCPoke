@@ -17,13 +17,13 @@
 (def users (atom {}))
 
 (defn init-user [uuid ws]
-  (stream/put! ws (json/encode {:uuid uuid}))
+  (stream/put! ws (json/encode {:myuuid uuid}))
   (swap! users assoc uuid {:author "Ash"}))
 
 (defn user-handler [uuid input ws]
   (stream/consume #(swap! users update-in [uuid] merge %) input)
   (stream/on-closed ws #(swap! users dissoc uuid))
-  (stream/periodically 30000 0 (fn [] {:users @users})))
+  (stream/periodically 10000 0 (fn [] {:users @users})))
 
 (def session-broadcast (stream/stream))
 
