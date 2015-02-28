@@ -1,13 +1,107 @@
-body {
+body, input {
   font-family: monospace;
+  font-size: 1.2em;
+}
+
+body, html, .container {
+  height: 100%;
 }
 
 .border {
     border: 14px double black;
-    border-image: url(border.png) 14 repeat;
+    border-image: url(images/border.png) 14 repeat;
 }
 
 #chatbox {
   height: 200px;
   overflow-y: scroll;
+  margin-right: 150px;
+}
+
+#chatform {
+  margin-right: 150px;
+  margin-top: 20px;
+}
+
+#userlist {
+  width: 100px;
+  float: right;
+}
+
+#logo {
+  float: left;
+  margin-top: 16px;
+}
+
+#content {
+  clear:both;
+  margin-top: 25px;
+}
+
+#connection {
+  background-image: url(images/pipe.png);
+  background-repeat: repeat-x;
+  background-position: 0 22px;
+  width: 400px;
+  margin: 0 auto;
+}
+
+#connection #globe {
+  float: left;
+}
+
+#connection #arduino {
+  margin: 16px 0 0 120px;
+}
+
+#connection #gameboy {
+  float: right;
+}
+
+ul {
+  margin: 1em 0 1em 0;
+  padding: 0;
+}
+
+ul li {
+  list-style: none;
+  height: 16px;
+  background-image: url(images/arrow.png);
+  background-repeat: no-repeat;
+  background-position: 0 -32px;
+  margin: 0;
+  padding: 0 0 0 16px;
+}
+
+ul li:hover {
+  background-position: 0 -16px;
+}
+
+ul li:active {
+  background-position: 0 0;
+}
+
+input:focus {
+  outline: none;
+}
+
+input[type="text"] {
+  border: none;
+  border-bottom: 2px solid black;
+  margin: 5px;
+}
+
+input[type="submit"] {
+  border: none;
+  height: 16px;
+  background-color: transparent;
+  background-image: url(images/arrow.png);
+  background-repeat: no-repeat;
+  background-position: 0 -16px;
+  margin: 0;
+  padding: 0 0 0 16px;
+}
+
+input[type="submit"]:active {
+  background-position: 0 0;
 }

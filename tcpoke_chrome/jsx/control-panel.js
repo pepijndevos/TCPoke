@@ -30,9 +30,9 @@ var ChatBox = React.createClass({
     return (
       <div>
         <div id="chatbox" className="border">
-        {msgs}
+          {msgs}
         </div>
-        <form className="commentForm" onSubmit={this.sendMessage}>
+        <form id="chatform" className="border" onSubmit={this.sendMessage}>
           <input type="text" placeholder="Your name" ref="author" />
           <input type="text" placeholder="Say something..." ref="text" />
           <input type="submit" value="Post" />
@@ -63,9 +63,12 @@ var UserList = React.createClass({
       }
     }
     return (
-      <ul id="userlist" className="border">
+      <div id="userlist" className="border">
+      <span>Connect?</span>
+      <ul>
       {users}
       </ul>
+      </div>
     );
   }
 });
@@ -128,11 +131,11 @@ function SessionHandler() {
 window.addEventListener('load', function () {
   window.session = new SessionHandler();
   React.render(
-    <div>
+    <div className="container">
       <UserList session={session} />
       <ChatBox session={session} />
     </div>,
-    document.body
+    document.getElementById("content")
   );
 });
 
