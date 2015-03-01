@@ -6,8 +6,8 @@ Internet of Pokemon
 
 This is what you call full-stack development.
 
-* `tcpoke_shield` KiCAD drawings for a Teensy shield for a Game Link Cable.
-* `tcpoke_teensy` Arduino sketch for talking to a Game Boy via a Teensy 2.0 in raw HID mode.
+* `tcpoke_shield` KiCAD drawings for a Teensy 2.0 shield for a Game Link Cable.
+* `tcpoke_teensy` Arduino sketch for talking to a Game Boy via a Teensy in raw HID mode.
 * `tcpoke_chrome` Chrome App talking USB HID and WebRTC.
 * `tcpoke_server` Clojure WebSocket server for chat and WebRTC initiation.
 
