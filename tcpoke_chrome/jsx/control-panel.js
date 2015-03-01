@@ -8,9 +8,8 @@ var rtcsettings = {
 };
 
 var ChatBox = React.createClass({
-  addMessage: function(message) {
-    this.state.messages.push(message);
-    this.setState(this.state);
+  addMessage: function() {
+    this.setState({"messages": this.props.session.messages});
   },
   sendMessage: function(e) {
     e.preventDefault();
@@ -25,7 +24,7 @@ var ChatBox = React.createClass({
     this.refs.text.getDOMNode().value = '';
   },
   componentDidMount: function() {
-    this.props.session.register("text", this.addMessage);
+    this.props.session.addCallback(this.addMessage);
   },
   getInitialState: function() {
     return {messages: []};
@@ -53,14 +52,13 @@ var ChatBox = React.createClass({
 
 var UserList = React.createClass({
   connect: function(uuid, e) {
-    console.log(uuid);
-    this.props.session.connect(uuid);
+    this.props.session.request_connect(uuid);
   },
-  setUsers: function(users) {
-    this.setState(users);
+  setUsers: function() {
+    this.setState({"users": this.props.session.users});
   },
   componentDidMount: function() {
-    this.props.session.register("users", this.setUsers);
+    this.props.session.addCallback(this.setUsers);
   },
   getInitialState: function() {
     return {users: {}};
@@ -88,14 +86,24 @@ var UserList = React.createClass({
 
 function SessionHandler() {
   var self = this;
-
   var callbacks = {};
-  self.register = function(key, callback) {
-    callbacks[key] = callback;
+  var views = [];
+  var uuid = undefined;
+
+  self.users = {};
+  self.messages = [];
+
+  self.addCallback = function(cb) {
+    views.push(cb);
   }
 
-  var uuid = undefined;
+  var notify = function() {
+    views.map(function(cb) { cb(); });
+  }
+
   callbacks["myuuid"] = function(message) { uuid = message.myuuid; };
+  callbacks["users"] = function(message) { self.users = message.users; notify(); };
+  callbacks["text"] = function(message) { self.messages.push(message); notify(); };
 
   self.sendChat = function(author, text) {
     self.socket.send(JSON.stringify({
@@ -105,20 +113,52 @@ function SessionHandler() {
     }));
   }
   
-  self.connect = function(them) {
+  var peerconnection = function(to) {
     var pc = new RTCPeerConnection(rtcsettings);
     pc.onicecandidate = function(e) {
       if(e.candidate) {
         self.socket.send(JSON.stringify({
-          "to": them,
+          "to": to,
           "uuid": uuid,
           "candidate": e.candidate,
         }));
       }
     };
-    self.channel = pc.createDataChannel("gamelink");
-    console.log(pc, self.channel);
+    return pc;
+  }
+
+  var init_channel = function(dc) {
+    var teensy = new TeensyController();
+    teensy.socket = dc;
+    dc.onopen = function(e) { teensy.enumerateDevices(); };
+    dc.onclose = function(e) {};
+    dc.onmessage = function(e) { teensy.send(e.message); };
+    dc.onerror = function(e) { dc.close(); };
+  }
+
+  var pcerror = function(e) {
+    console.warn(e);
+    self.peerconnection.close();
+    chrome.notifications.create("wsclose",
+      {"title": "Peer connection lost",
+       "message": "Try again later",
+       "type": "basic",
+       "iconUrl": "images/globe.gif"},
+      function(){});
+  }
+  
+  self.request_connect = function(them) {
+    self.socket.send(JSON.stringify({
+      "to": them,
+      "uuid": uuid,
+      "request": true}));
+  }
+  
+  chrome.notifications.onButtonClicked.addListener(function(them, idx) {
+    var pc = peerconnection(them);
     self.peerconnection = pc;
+    self.channel = pc.createDataChannel("gamelink");
+    init_channel(self.channel);
     pc.createOffer(function(offer) {
       pc.setLocalDescription(new RTCSessionDescription(offer), function() {
         self.socket.send(JSON.stringify({
@@ -126,40 +166,40 @@ function SessionHandler() {
           "uuid": uuid,
           "offer": offer,
         }));
-      }, pc.close);
-    }, pc.close);
+      }, pcerror);
+    }, pcerror);
+  });
+
+  callbacks["request"] = function(message) {
+    var name = self.users[message.uuid].author;
+    chrome.notifications.create(message.uuid,
+      {"title": name + " wants to fight!",
+       "message": "Do you want to link?",
+       "type": "basic",
+       "buttons": [{"title": "Connect"}],
+       "iconUrl": "images/globe.gif"},
+      function(){});
   }
 
   callbacks["answer"] = function(message) {
     self.peerconnection.setRemoteDescription(
         new RTCSessionDescription(message.answer),
         function() { },
-        self.peerconnection.close);
+        pcerror);
   }
 
   callbacks["candidate"] = function(message) {
-    console.log(message)
     self.peerconnection.addIceCandidate(new RTCIceCandidate(message.candidate));
   }
 
   callbacks["offer"] = function(message) {
     var offer = message.offer;
-    var pc = new RTCPeerConnection(rtcsettings);
+    var pc = peerconnection(message.uuid);
     self.peerconnection = pc;
-    pc.onicecandidate = function(e) {
-      if(e.candidate) {
-        self.socket.send(JSON.stringify({
-          "to": message.uuid,
-          "uuid": uuid,
-          "candidate": e.candidate,
-        }));
-      }
-    };
     pc.ondatachannel = function(e) {
       self.channel = e.channel;
-      console.log(self.channel);
+      init_channel(self.channel);
     }
-    console.log(pc);
     pc.setRemoteDescription(new RTCSessionDescription(offer), function() {
       pc.createAnswer(function(answer) {
         pc.setLocalDescription(new RTCSessionDescription(answer), function() {
@@ -168,9 +208,9 @@ function SessionHandler() {
             "uuid": uuid,
             "answer": answer,
           }));
-        }, pc.close);
-      }, pc.close);
-    }, pc.close);
+        }, pcerror);
+      }, pcerror);
+    }, pcerror);
   };
 
   var init = function() {
@@ -214,57 +254,75 @@ window.addEventListener('load', function () {
   );
 });
 
-function enumerateDevices() {
-  var deviceIds = [];
-  var permissions = chrome.runtime.getManifest().permissions;
-  for (var i = 0; i < permissions.length; ++i) {
-    var p = permissions[i];
-    if (p.hasOwnProperty('usbDevices')) {
-      deviceIds = p.usbDevices;
+function TeensyController() {
+  self = this;
+  self.socket = undefined;
+  self.hid_connection = undefined;
+
+  var pollForInput = function() {
+    chrome.hid.receive(self.hid_connection, function(reportId, data) {
+      setTimeout(pollForInput, 0);
+      var data = new Uint8Array(data);
+      console.log("> " + byteToHex(data[0]));
+      if(self.socket) {
+        self.socket.send(data[0]);
+      }
+    });
+  }
+
+  var connectDevice = function(deviceInfo) {
+    if (!deviceInfo)
+      return;
+    chrome.hid.connect(deviceInfo.deviceId, function(connectInfo) {
+      if (!connectInfo) {
+        console.warn("Unable to connect to device.");
+      }
+      self.hid_connection = connectInfo.connectionId;
+      self.reset();
+      pollForInput();
+    });
+  }
+
+  var onDevicesEnumerated = function(devices) {
+    var dev = devices[0];
+    console.log(dev);
+    if(dev) {
+      connectDevice(devices[0]);
+    } else {
+      chrome.notifications.create("teensymissing",
+          {"title": "Teensy not connected",
+            "message": "Connect your Teensy and try again",
+            "type": "basic",
+            "iconUrl": "images/arduino.png"},
+          function(){});
     }
   }
-  chrome.hid.getDevices({"filters": deviceIds}, onDevicesEnumerated);
-}
 
-function onDevicesEnumerated (devices) {
-    console.log(devices);
-    connectDevice(devices[0]);
-}
+  self.reset = function() {
+    var bytes = new Uint8Array(64);
+    bytes[1] = 1;
+    chrome.hid.send(self.hid_connection, 0, bytes.buffer, function() {});
+  }
 
-function connectDevice (deviceInfo) {
-  if (!deviceInfo)
-    return;
-  chrome.hid.connect(deviceInfo.deviceId, function(connectInfo) {
-    if (!connectInfo) {
-      console.warn("Unable to connect to device.");
+  self.send = function(out_data) {
+    console.log("< " + byteToHex(out_data));
+    var bytes = new Uint8Array(64);
+    bytes[0] = out_data;
+    // what is the callback for?
+    chrome.hid.send(self.hid_connection, 0, bytes.buffer, function() {});
+  }
+
+  self.enumerateDevices = function() {
+    var deviceIds = [];
+    var permissions = chrome.runtime.getManifest().permissions;
+    for (var i = 0; i < permissions.length; ++i) {
+      var p = permissions[i];
+      if (p.hasOwnProperty('usbDevices')) {
+        deviceIds = p.usbDevices;
+      }
     }
-    hid_connection = connectInfo.connectionId;
-    reset(hid_connection);
-    pollForInput(console.log);
-  });
-}
-
-function reset(hid_connection) {
-  var bytes = new Uint8Array(64);
-  bytes[1] = 1;
-  chrome.hid.send(hid_connection, 0, bytes.buffer, function() {});
-}
-
-function sendOutput (hid_connection, out_data) {
-  console.log("> " + byteToHex(out_data));
-  var bytes = new Uint8Array(64);
-  bytes[0] = out_data;
-  // what is the callback for?
-  chrome.hid.send(hid_connection, 0, bytes.buffer, function() {});
-}
-
-function pollForInput(callback) {
-  chrome.hid.receive(hid_connection, function(reportId, data) {
-    setTimeout(pollForInput, 0);
-    var data = new Uint8Array(data);
-    console.log("> " + byteToHex(data[0]));
-    callback(data[0]);
-  });
+    chrome.hid.getDevices({"filters": deviceIds}, onDevicesEnumerated);
+  }
 }
 
 function byteToHex (value) {
