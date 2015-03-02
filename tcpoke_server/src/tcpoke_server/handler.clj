@@ -23,7 +23,7 @@
 (defn user-handler [uuid input ws]
   (stream/consume #(swap! users update-in [uuid] merge %) input)
   (stream/on-closed ws #(swap! users dissoc uuid))
-  (stream/periodically 10000 0 (fn [] {:users @users})))
+  (stream/periodically 30000 0 (fn [] {:users @users})))
 
 (def session-broadcast (stream/stream))
 

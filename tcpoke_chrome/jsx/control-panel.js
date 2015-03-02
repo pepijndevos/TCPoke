@@ -102,8 +102,15 @@ function SessionHandler() {
   }
 
   callbacks["myuuid"] = function(message) { uuid = message.myuuid; };
-  callbacks["users"] = function(message) { self.users = message.users; notify(); };
-  callbacks["text"] = function(message) { self.messages.push(message); notify(); };
+  callbacks["users"] = function(message) {
+    self.users = message.users;
+    notify();
+  };
+  callbacks["text"] = function(message) {
+    self.messages.push(message);
+    self.users[message.uuid].author = message.author;
+    notify();
+  };
 
   self.sendChat = function(author, text) {
     self.socket.send(JSON.stringify({
@@ -132,7 +139,7 @@ function SessionHandler() {
     teensy.socket = dc;
     dc.onopen = function(e) { teensy.enumerateDevices(); };
     dc.onclose = function(e) {};
-    dc.onmessage = function(e) { teensy.send(e.message); };
+    dc.onmessage = function(e) { teensy.send(e.data); };
     dc.onerror = function(e) { dc.close(); };
   }
 
@@ -214,7 +221,7 @@ function SessionHandler() {
   };
 
   var init = function() {
-    self.socket = new WebSocket("ws://localhost:3000/websocket");
+    self.socket = new WebSocket("ws://tcpoke.herokuapp.com/websocket");
    
     self.socket.onerror = function () { self.socket.close() };
     self.socket.onclose = function () {
