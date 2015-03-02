@@ -84,14 +84,45 @@ var UserList = React.createClass({
   }
 });
 
+var ConnectionStatus = React.createClass({
+  setConnections: function() {
+    var session = this.props.session;
+    this.setState({
+      "server": session.socket.readyState == 1,
+      "peer": session.channel ? session.channel.readyState == "open" : false,
+      "teensy": session.teensy ? session.teensy.hid_connection : false,
+      "gameboy": session.teensy ? session.teensy.bytes : 0,
+    })
+  },
+  componentDidMount: function() {
+    this.props.session.addCallback(this.setConnections);
+  },
+  getInitialState: function() {
+    return {gameboy: 0, teensy: false, peer: false, server: false};
+  },
+  render: function() {
+    return (
+      <div id="connectionstate" className="border">
+        <div><span className={this.state.server ? 'ball active' : 'ball'}></span> Server</div>
+        <div><span className={this.state.peer ? 'ball active' : 'ball'}></span> Peer</div>
+        <div><span className={this.state.teensy ? 'ball active' : 'ball'}></span> Teensy</div>
+        <div><span className={this.state.gameboy ? 'ball active' : 'ball'}></span> Game Boy ({this.state.gameboy})</div>
+      </div>
+    );
+  }
+});
+
 function SessionHandler() {
   var self = this;
   var callbacks = {};
   var views = [];
-  var uuid = undefined;
+  var uuid = null;
 
   self.users = {};
   self.messages = [];
+  self.socket = null;
+  self.channel = null;
+  self.teensy = null;
 
   self.addCallback = function(cb) {
     views.push(cb);
@@ -135,11 +166,12 @@ function SessionHandler() {
   }
 
   var init_channel = function(dc) {
-    var teensy = new TeensyController();
-    teensy.socket = dc;
-    dc.onopen = function(e) { teensy.enumerateDevices(); };
-    dc.onclose = function(e) {};
-    dc.onmessage = function(e) { teensy.send(e.data); };
+    self.teensy = new TeensyController();
+    self.teensy.socket = dc;
+    self.teensy.addCallback(notify);
+    dc.onopen = function(e) { self.teensy.enumerateDevices(); notify(); };
+    dc.onclose = function(e) { notify(); };
+    dc.onmessage = function(e) { self.teensy.send(e.data); };
     dc.onerror = function(e) { dc.close(); };
   }
 
@@ -254,6 +286,7 @@ window.addEventListener('load', function () {
   window.session = new SessionHandler();
   React.render(
     <div className="container">
+      <ConnectionStatus session={session} />
       <UserList session={session} />
       <ChatBox session={session} />
     </div>,
@@ -265,6 +298,17 @@ function TeensyController() {
   self = this;
   self.socket = undefined;
   self.hid_connection = undefined;
+  self.bytes = 0;
+
+  var views = [];
+
+  self.addCallback = function(cb) {
+    views.push(cb);
+  }
+
+  var notify = function() {
+    views.map(function(cb) { cb(); });
+  }
 
   var pollForInput = function() {
     chrome.hid.receive(self.hid_connection, function(reportId, data) {
@@ -274,6 +318,8 @@ function TeensyController() {
       if(self.socket) {
         self.socket.send(data[0]);
       }
+      self.bytes += 1;
+      notify();
     });
   }
 
@@ -287,6 +333,7 @@ function TeensyController() {
       self.hid_connection = connectInfo.connectionId;
       self.reset();
       pollForInput();
+      notify();
     });
   }
 
@@ -309,6 +356,7 @@ function TeensyController() {
     var bytes = new Uint8Array(64);
     bytes[1] = 1;
     chrome.hid.send(self.hid_connection, 0, bytes.buffer, function() {});
+    self.bytes = 0;
   }
 
   self.send = function(out_data) {

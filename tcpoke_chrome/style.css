@@ -15,17 +15,19 @@ body, html, .container {
 #chatbox {
   height: 200px;
   overflow-y: scroll;
-  margin-right: 150px;
+  margin-right: 200px;
 }
 
 #chatform {
-  margin-right: 150px;
+  margin-right: 200px;
   margin-top: 20px;
 }
 
-#userlist {
-  width: 100px;
+#userlist, #connectionstate {
+  width: 150px;
   float: right;
+  clear: right;
+  margin-bottom: 20px;
 }
 
 #logo {
@@ -56,6 +58,19 @@ body, html, .container {
 
 #connection #gameboy {
   float: right;
+}
+
+.ball {
+  height: 16px;
+  background-image: url(images/ball.png);
+  background-repeat: no-repeat;
+  background-position: 0 -16px;
+  margin: 0;
+  padding: 0 0 0 32px;
+}
+
+.ball.active {
+  background-position: 0 0px;
 }
 
 ul {
