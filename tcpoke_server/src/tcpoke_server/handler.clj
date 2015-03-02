@@ -18,7 +18,7 @@
 
 (defn init-user [uuid ws]
   (stream/put! ws (json/encode {:myuuid uuid}))
-  (swap! users assoc uuid {:author "Ash"}))
+  (swap! users assoc uuid {:author "???"}))
 
 (defn user-handler [uuid input ws]
   (stream/consume #(swap! users update-in [uuid] merge %) input)
