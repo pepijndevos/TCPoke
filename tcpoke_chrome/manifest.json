@@ -2,12 +2,15 @@
 	"name": "TCPoke",
 	"manifest_version": 2,
 	"version": "0.1",
-  "minimum_chrome_version": "36.0.1941.0",
 	"app": {
 		"background": {
 			"scripts": [ "main.js" ]
 		}
 	},
+  "icons": {
+    "48": "images/globe-48.png",
+    "128": "images/globe-128.png"
+  },
 	"permissions": [
     "notifications",
 		"hid",
