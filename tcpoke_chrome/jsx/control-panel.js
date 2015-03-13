@@ -85,6 +85,15 @@ var UserList = React.createClass({
 });
 
 var ConnectionStatus = React.createClass({
+  reset: function() {
+    if(this.props.session.channel){
+      this.props.session.channel.close()
+    }
+    if(this.props.session.teensy){
+      this.props.session.teensy.reset();
+    }
+    this.setConnections();
+  },
   setConnections: function() {
     var session = this.props.session;
     this.setState({
@@ -103,6 +112,7 @@ var ConnectionStatus = React.createClass({
   render: function() {
     return (
       <div id="connectionstate" className="border">
+        <input type="button" onClick={this.reset} value="Reset" />
         <div><span className={this.state.server ? 'ball active' : 'ball'}></span> Server</div>
         <div><span className={this.state.peer ? 'ball active' : 'ball'}></span> Peer</div>
         <div><span className={this.state.teensy ? 'ball active' : 'ball'}></span> Teensy</div>
@@ -152,7 +162,7 @@ function SessionHandler() {
   }
   
   var peerconnection = function(to) {
-    var pc = new RTCPeerConnection(rtcsettings);
+    var pc = new webkitRTCPeerConnection(rtcsettings);
     pc.onicecandidate = function(e) {
       if(e.candidate) {
         self.socket.send(JSON.stringify({
