@@ -133,6 +133,7 @@ function SessionHandler() {
   self.socket = null;
   self.channel = null;
   self.teensy = null;
+  self.random_data = null;
 
   self.addCallback = function(cb) {
     views.push(cb);
@@ -324,9 +325,10 @@ function TeensyController() {
     chrome.hid.receive(self.hid_connection, function(reportId, data) {
       setTimeout(pollForInput, 0);
       var data = new Uint8Array(data);
-      console.log("> " + byteToHex(data[0]));
+      var transmission = PokeState(data[0]);
+      console.log(byteToHex(transmission));
       if(self.socket) {
-        self.socket.send(data[0]);
+        self.socket.send(transmission);
       }
       self.bytes += 1;
       notify();
@@ -370,7 +372,7 @@ function TeensyController() {
   }
 
   self.send = function(out_data) {
-    console.log("< " + byteToHex(out_data));
+    //console.log("< " + byteToHex(out_data));
     var bytes = new Uint8Array(64);
     bytes[0] = out_data;
     // what is the callback for?
@@ -388,6 +390,28 @@ function TeensyController() {
     }
     chrome.hid.getDevices({"filters": deviceIds}, onDevicesEnumerated);
   }
+}
+
+var state = "init";
+var byte_counter = 0;
+function PokeState(input) {
+  var output = input; // by default do nothing
+
+  if(state == "init" && input == 97) { //0x61
+    state = "gen2_init"; // ignore for now
+  } else if(state == "init" && input == 96) { //0x60
+    state = "gen1_init";
+  } else if(state == "gen1_init" && input == 253) { // padding
+    state = "gen1_random_wait";
+  } else if(state == "gen1_random_wait" && input != 253) { // not padding
+    output = 0;
+    state = "gen1_random";
+  } else if(state == "gen1_random" && input != 253) { // not padding
+    output = 0;
+  } else if(state == "gen1_random" && input == 253) { // padding
+    state = "gen1_party_wait";
+  }
+  return output;
 }
 
 function byteToHex (value) {
