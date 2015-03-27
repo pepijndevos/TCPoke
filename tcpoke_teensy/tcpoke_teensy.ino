@@ -12,6 +12,8 @@
 #define READ_DELAY 10 // Gen II requires a fast negotiation
 #define WRITE_DELAY 1000 // Try not to lose bytes
 
+#define LED 20
+
 
 byte buffer[64];
 
@@ -21,6 +23,8 @@ void setup() {
 
     SPI.begin();
     SPI.beginTransaction(SPISettings(8000, MSBFIRST, SPI_MODE3));
+    
+    pinMode(LED, OUTPUT);
 }
 
 bool connected = false;
@@ -29,9 +33,13 @@ void loop() {
     byte in_data = 0;
     byte out_data = RawHID.recv(buffer, READ_DELAY);
     if(out_data) {
+        digitalWrite(LED, HIGH);
         connected = true;
         out_data = buffer[0];
-        if(buffer[1]) connected = false; // reset
+        if(buffer[1]) {
+          digitalWrite(LED, LOW);
+          connected = false; // reset
+        }
     } else if (!connected) {
         out_data = ESTABLISH_CONNECTION_WITH_INTERNAL_CLOCK;
     } else {
@@ -42,6 +50,7 @@ void loop() {
     Serial.print("\n");
 
     if(connected || in_data == SERIAL_NYBLE || in_data == SERIAL_NYBLE+1) {
+        digitalWrite(LED, HIGH);
         connected = true;
         buffer[0] = in_data;
         RawHID.send(buffer, WRITE_DELAY);
