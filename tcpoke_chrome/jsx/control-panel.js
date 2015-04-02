@@ -323,13 +323,13 @@ function TeensyController() {
     views.map(function(cb) { cb(); });
   }
 
-  var reading = false;
+  //var reading = false;
   var pollForInput = function() {
-    if(!reading) {
-      reading = true;
+    //if(!reading) {
+      //reading = true;
       //console.log("receiving");
       chrome.hid.receive(self.hid_connection, function(reportId, data) {
-        reading = false;
+        //reading = false;
         setTimeout(pollForInput, 0);
         var data = new Uint8Array(data);
         var transmission = PokeState(data[0]);
@@ -340,7 +340,7 @@ function TeensyController() {
         self.bytes += 1;
         notify();
       });
-    }
+    //}
   }
 
   var connectDevice = function(deviceInfo) {
@@ -388,15 +388,17 @@ function TeensyController() {
   }
 
   self.enumerateDevices = function() {
-    var deviceIds = [];
-    var permissions = chrome.runtime.getManifest().permissions;
-    for (var i = 0; i < permissions.length; ++i) {
-      var p = permissions[i];
-      if (p.hasOwnProperty('usbDevices')) {
-        deviceIds = p.usbDevices;
+    if(!self.hid_connection) {
+      var deviceIds = [];
+      var permissions = chrome.runtime.getManifest().permissions;
+      for (var i = 0; i < permissions.length; ++i) {
+        var p = permissions[i];
+        if (p.hasOwnProperty('usbDevices')) {
+          deviceIds = p.usbDevices;
+        }
       }
+      chrome.hid.getDevices({"filters": deviceIds}, onDevicesEnumerated);
     }
-    chrome.hid.getDevices({"filters": deviceIds}, onDevicesEnumerated);
   }
 }
 
