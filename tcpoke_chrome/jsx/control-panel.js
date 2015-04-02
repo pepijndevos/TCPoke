@@ -177,7 +177,9 @@ function SessionHandler() {
   }
 
   var init_channel = function(dc) {
-    self.teensy = new TeensyController();
+    if(!self.teensy) {
+      self.teensy = new TeensyController();
+    }
     self.teensy.socket = dc;
     self.teensy.addCallback(notify);
     dc.onopen = function(e) { self.teensy.enumerateDevices(); notify(); };
@@ -321,18 +323,24 @@ function TeensyController() {
     views.map(function(cb) { cb(); });
   }
 
+  var reading = false;
   var pollForInput = function() {
-    chrome.hid.receive(self.hid_connection, function(reportId, data) {
-      setTimeout(pollForInput, 0);
-      var data = new Uint8Array(data);
-      var transmission = PokeState(data[0]);
-      console.log(byteToHex(transmission));
-      if(self.socket) {
-        self.socket.send(transmission);
-      }
-      self.bytes += 1;
-      notify();
-    });
+    if(!reading) {
+      reading = true;
+      //console.log("receiving");
+      chrome.hid.receive(self.hid_connection, function(reportId, data) {
+        reading = false;
+        setTimeout(pollForInput, 0);
+        var data = new Uint8Array(data);
+        var transmission = PokeState(data[0]);
+        console.log(byteToHex(transmission));
+        if(self.socket) {
+          self.socket.send(transmission);
+        }
+        self.bytes += 1;
+        notify();
+      });
+    }
   }
 
   var connectDevice = function(deviceInfo) {
@@ -404,6 +412,7 @@ function PokeState(input) {
   } else if(state == "gen1_init" && input == 253) { // padding
     state = "gen1_random_wait";
   } else if(state == "gen1_random_wait" && input != 253) { // not padding
+    console.log("random");
     output = 0;
     state = "gen1_random";
   } else if(state == "gen1_random" && input != 253) { // not padding
