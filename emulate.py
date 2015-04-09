@@ -1,76 +1,99 @@
+import threading
 import socket
-import time
 import struct
+import random
+import time
 import enum
 import hid
+import sys
+import os
+
+class BGBLinkCable():
+	def __init__(self,ip,port):
+		self.ip = ip
+		self.port = port
+		self.ticks = 0
+		self.frames = 0
+		self.received = 0
+		self.sent = 0
+		self.transfer = -1
+		self.exchangeHandler = None
+		
+	def start(self):
+		self.sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+		self.sock.connect((self.ip, self.port))
+		threading.Thread(target=self.networkLoop, daemon=True).start()
+	
+	def queryStatus(self):
+		status = [0x6a,0,0,0,0,0,0,0]
+		self.ticks += 1
+		self.frames += 8
+		status[2] = self.ticks % 256
+		status[3] = (self.ticks // 256) % 256
+		status[5] = self.frames % 256
+		status[6] = (self.frames // 256) % 256
+		status[7] = (self.frames // 256 // 256) % 256
+		return bytes(status)
+		
+	def getStatus(self):
+		return (self.frames, self.ticks, self.received, self.sent)
+	
+	def networkLoop(self):
+		while True:
+			try:
+				data = bytearray(self.sock.recv(8))
+			except KeyboardInterrupt:
+				raise
+			if len(data) == 0:
+				break
+			if data[0] == 0x01:
+				self.sock.send(data)
+				self.sock.send(b'\x6c\x03\x00\x00\x00\x00\x00\x00')
+				continue
+			if data[0] == 0x6C:
+				self.sock.send(b'\x6c\x01\x00\x00\x00\x00\x00\x00')
+				self.sock.send(self.queryStatus())
+				continue
+			if data[0] == 0x65:
+				continue
+			if data[0] == 0x6A:
+				self.sock.send(self.queryStatus())
+				continue
+			if data[0] == 0x69:
+				self.sock.send(self.queryStatus())
+				continue
+			if data[0] == 0x68:
+				self.received+=1
+				self.sent+=1
+				data[1] = self.exchangeHandler(data[1], self)
+				self.sock.send(data)
+				self.sock.send(self.queryStatus())
+				continue
+			print("Unknown command " + hex(data[0]))
+			print(data)
+			
+	def setExchangeHandler(self, ex):
+		self.exchangeHandler = ex
 
 paths = [t['path'] for t in hid.enumerate(5824, 1158) if t['usage'] == 512]
 teensy = hid.device()
 teensy.open_path(paths[0])
-teensy.set_nonblocking(1)
+#teensy.set_nonblocking(1)
 buf = bytearray([0]*64)
 
-#reset
-buf[0:2] = [0x01, 0x01]
-teensy.write(buf)
-buf[0:2] = [0x00, 0x00]
-
-class Command(enum.IntEnum):
-    version = 1
-    joypad = 101
-    master = 104
-    slave = 105
-    sync = 106
-    status = 108
-
-fmt = "!BBBBI"
-pkgsize = struct.calcsize(fmt)
-
-def timestamp():
-    return int(time.time() * (2**21)) & 0x7fffffff
-
-def command(cmd, b1=0, b2=0, b3=0):
-    return struct.pack(fmt, cmd, b1, b2, b3, timestamp())
-
-def parse(data):
-    res = struct.unpack(fmt, data)
-    return (Command(res[0]),) + res[1:4]
-
-def read_all(sock):
-    try:
-        while True:
-            yield parse(sock.recv(pkgsize))
-    except BlockingIOError:
-        pass
+def myHandler(data, obj):
+    buf[0] = data
+    teensy.write(buf)
+    return teensy.read(64)[0]
 
 if __name__ == "__main__":
-    with socket.create_connection(("127.0.0.1", 8765)) as sock:
-        sock.settimeout(0)
-        sock.send(command(Command.version, 1, 4))
-        sock.send(command(Command.status, 1))
-        connected = False
+    try:
+        print("[!] Connecting to 127.0.0.1:8765...")
+        link = BGBLinkCable('127.0.0.1',8765)
+        link.setExchangeHandler(myHandler)
+        link.start()
+        print("[!] Waiting for link cable interaction")
         while True:
-            time.sleep(0.01)
-            try:
-                data_in = teensy.read(64)[0]
-            except IndexError:
-                data_in = -1
-
-            if not connected:
-                sock.send(command(Command.master, 0x01, 0x81))
-            elif data_in > -1:
-                print("gb", hex(data_in))
-                sock.send(command(Command.master, data_in, 0x81))
-            else:
-                sock.send(command(Command.sync, 1))
-
-            for cmd, b1, b2, b3 in read_all(sock):
-                print(cmd, hex(b1))
-                if cmd == Command.sync and b1 == 0:
-                    sock.send(command(Command.sync))
-                elif cmd == Command.slave:
-                    if connected or b1 == 0x60:
-                        connected = True
-                        buf[0] = b1
-                        teensy.write(buf)
-
+            time.sleep(1)
+    except KeyboardInterrupt:
+        pass

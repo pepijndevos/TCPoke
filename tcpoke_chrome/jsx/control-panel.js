@@ -377,6 +377,7 @@ function TeensyController() {
     bytes[1] = 1;
     chrome.hid.send(self.hid_connection, 0, bytes.buffer, function() {});
     self.bytes = 0;
+    state = "iniit"; // connection state machine
   }
 
   self.send = function(out_data) {
@@ -403,7 +404,6 @@ function TeensyController() {
 }
 
 var state = "init";
-var byte_counter = 0;
 function PokeState(input) {
   var output = input; // by default do nothing
 
