@@ -377,7 +377,7 @@ function TeensyController() {
     bytes[1] = 1;
     chrome.hid.send(self.hid_connection, 0, bytes.buffer, function() {});
     self.bytes = 0;
-    state = "iniit"; // connection state machine
+    state = "init"; // connection state machine
   }
 
   self.send = function(out_data) {
